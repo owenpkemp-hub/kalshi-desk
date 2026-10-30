@@ -1,0 +1,199 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#090b10"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png"><title>Kalshi Desk</title>
+<style>
+:root{--bg:#090b10;--card:#11151f;--bd:#1e2536;--g:#00f59b;--r:#ff4d6a;--mu:#8a93a8;--y:#ffc94d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#e8ecf4;font:14px/1.4 -apple-system,Inter,system-ui,sans-serif}
+.wrap{max-width:540px;margin:0 auto;padding:10px 12px 80px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin:10px 0}
+.row{display:flex;align-items:center;gap:8px}.sp{justify-content:space-between}.mu{color:var(--mu);font-size:12px}
+.g{color:var(--g)}.r{color:var(--r)}.y{color:var(--y)}.badge{font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+h1{font-size:18px;margin:0}h2{font-size:13px;margin:0 0 8px;color:var(--mu);text-transform:uppercase;letter-spacing:.06em}
+.big{font-size:28px;font-weight:700}.tabs{position:fixed;bottom:0;left:0;right:0;background:#0d1018ee;border-top:1px solid var(--bd);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom);z-index:5}
+.tabs button{flex:1;max-width:135px;background:none;border:0;color:var(--mu);padding:12px 4px;font-size:12px}.tabs button.on{color:var(--g)}
+button.b,a.b{background:#1a2030;border:1px solid var(--bd);color:#e8ecf4;border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-block}
+button.bg{background:var(--g);color:#000;border:0;font-weight:600}button.br{background:var(--r);color:#000;border:0;font-weight:600}
+input,select{background:#0d1018;border:1px solid var(--bd);color:#e8ecf4;border-radius:10px;padding:8px;font-size:14px;width:100%}
+table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:5px 3px;border-bottom:1px solid var(--bd);text-align:left}
+.agent{display:grid;grid-template-columns:70px 1fr 60px;gap:6px;padding:6px 0;border-bottom:1px solid var(--bd);font-size:12px}
+.mk{border-top:1px solid var(--bd);padding:10px 0}.mk:first-child{border-top:0}
+.px{font-variant-numeric:tabular-nums}.hide{display:none}.log{max-height:260px;overflow:auto;font:11px ui-monospace,monospace}
+.modal{position:fixed;inset:0;background:#000b;z-index:9;overflow:auto}.modal .card{max-width:520px;margin:30px auto}
+label{display:block;margin:8px 0 2px;font-size:12px;color:var(--mu)}input[type=range]{padding:0}
+</style></head><body><div class="wrap">
+<div class="row sp"><div><h1>Kalshi <span class="g">Desk</span></h1><div class="mu" id="src">loading…</div></div>
+<button class="b" onclick="load()">↻ Refresh</button></div>
+<div class="mu" style="font-size:11px">Paper trading first. No guaranteed profit — prediction markets are zero-sum after fees; most edges are illusions. Not financial advice.</div>
+
+<section id="t-term">
+ <div class="card"><h2>Paper equity</h2><div class="row sp"><div class="big px" id="eq">$—</div><div class="mu" id="eqsub"></div></div>
+ <svg id="curve" viewBox="0 0 300 70" style="width:100%;height:70px"></svg><div class="mu" id="curvenote"></div></div>
+ <div class="card"><h2>Desk — 7 agents (live run)</h2><div id="desk"></div></div>
+ <div class="card"><h2>Why they died</h2><div id="died"></div></div>
+ <div class="card"><div class="row sp"><h2>Logger</h2><button class="b" onclick="if(confirm('Clear log?')){S.log=[];save();render()}">Clear</button></div><div class="log" id="log"></div></div>
+</section>
+
+<section id="t-scan" class="hide">
+ <div class="card"><div class="row"><input id="q" placeholder="Search ticker / title…" oninput="renderScan()"><select id="cat" onchange="renderScan()" style="width:45%"></select></div>
+ <div class="row" style="margin-top:8px"><select id="view" onchange="renderScan()"><option value="surv">Filter survivors (by score)</option><option value="all">All loaded markets</option></select></div>
+ <div class="mu" id="scancount" style="margin-top:6px"></div></div>
+ <div class="card" id="mlist"></div>
+</section>
+
+<section id="t-pos" class="hide">
+ <div class="card"><h2>Open paper positions</h2><div id="open"></div></div>
+ <div class="card"><h2>Closed / settled</h2><div id="closed"></div></div>
+ <div class="card"><div class="row sp"><h2>Daily report</h2><button class="b" onclick="copyRep()">Copy</button></div><pre id="rep" style="white-space:pre-wrap;font-size:11px;margin:0"></pre></div>
+</section>
+
+<section id="t-rules" class="hide">
+ <div class="card"><h2>Go-live readiness</h2><div id="ready"></div></div>
+ <div class="card"><h2>Rules</h2><div id="sliders"></div><button class="b" style="margin-top:10px" onclick="S.cfg={...DEF};save();render()">Reset defaults</button></div>
+ <div class="card"><h2>Calibration (your probabilities vs settled outcomes)</h2><div id="calib"></div></div>
+ <div class="card"><button class="b br" onclick="if(confirm('Wipe ALL paper trades, log and settings?')){localStorage.removeItem(K);location.reload()}">Reset paper book</button></div>
+</section>
+</div>
+<div class="tabs"><button data-t="term" class="on">Terminal</button><button data-t="scan">Scanner</button><button data-t="pos">Positions</button><button data-t="rules">Rules</button></div>
+<div class="modal hide" id="modal"><div class="card" id="dossier"></div></div>
+<script>
+const API='https://api.elections.kalshi.com/trade-api/v2',K='kalshiDesk.v1';
+const DEF={bankroll:500,kelly:0.25,maxSpread:6,minVol24:50,minHours:1,maxDays:60,minEdge:5,perCap:5,heatCap:15};
+let S=JSON.parse(localStorage.getItem(K)||'null')||{cfg:{...DEF},trades:[],log:[],seen:{}};S.cfg={...DEF,...S.cfg};
+let M=[],BY={},RUN={},META={};
+const save=()=>localStorage.setItem(K,JSON.stringify(S));
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const usd=x=>(x<0?'-':'')+'$'+Math.abs(x).toFixed(2),ts=()=>new Date().toISOString();
+function log(agent,msg){S.log.unshift({t:ts(),a:agent,m:msg});S.log=S.log.slice(0,500);}
+const hrs=m=>(new Date(m.close_time)-Date.now())/36e5;
+function norm(m){const c=x=>x==null||x===''?null:Math.round(parseFloat(x)*10000)/100,f=x=>parseFloat(x)||0;
+ if(m.yes_bid!=null&&m.series_ticker!=null)return m;
+ const bid=c(m.yes_bid_dollars),ask=c(m.yes_ask_dollars);
+ return{ticker:m.ticker,event_ticker:m.event_ticker,series_ticker:(m.event_ticker||'').split('-')[0],category:'',title:m.title,subtitle:m.yes_sub_title,
+ yes_bid:bid,yes_ask:ask,no_bid:c(m.no_bid_dollars),no_ask:c(m.no_ask_dollars),last_price:c(m.last_price_dollars),previous_price:c(m.previous_price_dollars),
+ volume:f(m.volume_fp),volume_24h:f(m.volume_24h_fp),open_interest:f(m.open_interest_fp),liquidity:+((bid||0)/100*f(m.yes_bid_size_fp)+(100-(ask||100))/100*f(m.yes_ask_size_fp)).toFixed(2),close_time:m.close_time};}
+async function load(){
+ $('src').textContent='loading…';let mode='';
+ const blk=+localStorage.getItem(K+'.directBlocked')||0;
+ try{if(Date.now()-blk<864e5)throw 0;const r=await fetch(API+'/events?status=open&limit=200&with_nested_markets=true',{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();
+  M=[];d.events.forEach(e=>(e.markets||[]).forEach(m=>{const n=norm(m);n.series_ticker=e.series_ticker;n.category=e.category;n.event_title=e.title;M.push(n)}));
+  META={fetched_at:ts(),count:M.length};mode='direct API';}
+ catch(e){if(!(Date.now()-blk<864e5))localStorage.setItem(K+'.directBlocked',Date.now());try{const r=await fetch('data/markets.json?'+Date.now());const d=await r.json();M=d.markets;META=d;mode='snapshot';}catch(e2){$('src').innerHTML='<span class="r">No data: direct API blocked (CORS) and snapshot missing.</span>';return;}}
+ BY={};M.forEach(m=>BY[m.ticker]=m);
+ const age=Math.round((Date.now()-new Date(META.fetched_at))/6e4);
+ $('src').innerHTML=`${M.length} real markets · ${mode} · fetched ${new Date(META.fetched_at).toLocaleString()} (${age}m ago)`+(mode==='snapshot'?' · auto-refresh every 15m via GitHub Actions':'');
+ // mark positions; auto-close when market vanished from snapshot is NOT assumed — settle manually
+ S.trades.filter(t=>!t.closed).forEach(t=>{const m=BY[t.ticker];if(m){t.mark=t.side==='YES'?m.yes_bid:(m.no_bid??(100-m.yes_ask));t.markAt=META.fetched_at;}});
+ pipeline();save();render();}
+function score(m){const c=S.cfg,sp=m.yes_ask-m.yes_bid,h=hrs(m);
+ const liq=Math.min(1,Math.log10(1+m.volume_24h+m.open_interest/10)/5),spr=1-sp/c.maxSpread,
+ tt=h<24?0.6:h<24*14?1:Math.max(0.3,1-(h/24-14)/(c.maxDays-14)*0.7),mom=m.previous_price!=null&&m.last_price!=null?Math.min(1,Math.abs(m.last_price-m.previous_price)/10):0;
+ return +(0.35*liq+0.3*spr+0.2*tt+0.15*mom).toFixed(3);}
+function heur(m){// HEURISTIC: mid shrunk 10% toward 50, nudged by momentum. Not a real fair value.
+ const mid=(m.yes_bid+m.yes_ask)/2,mom=m.previous_price!=null&&m.last_price!=null?(m.last_price-m.previous_price)*0.25:0;return Math.max(1,Math.min(99,mid*0.9+5+mom));}
+function judge(m,fair,src){const c=S.cfg,eY=fair-m.yes_ask,noAsk=m.no_ask??(100-m.yes_bid),eN=(100-fair)-noAsk,sp=m.yes_ask-m.yes_bid;
+ const risk=Math.min(5,Math.max(1,Math.round(1+sp/2+(m.volume_24h<200?1:0)+(m.liquidity<50?1:0))));
+ let action='PASS',why='no edge ≥ '+c.minEdge+'c';
+ if(eY>=c.minEdge){action='BUY YES';why=`edge ${eY.toFixed(1)}c on YES`}else if(eN>=c.minEdge){action='BUY NO';why=`edge ${eN.toFixed(1)}c on NO`}
+ else if(Math.max(eY,eN)>=c.minEdge/2){action='WATCH';why='edge '+Math.max(eY,eN).toFixed(1)+'c < threshold'}
+ if(action.startsWith('BUY')&&risk>=5){action='WATCH';why+=' but exit risk 5/5'}
+ return{fair,src,eY,eN,noAsk,risk,action,why,hasFair:src==='owen'};}
+function size(m,j){const c=S.cfg,side=j.action==='BUY NO'?'NO':'YES',p=(side==='YES'?j.fair:100-j.fair)/100,price=(side==='YES'?m.yes_ask:j.noAsk)/100;
+ const b=(1-price)/price,k=Math.max(0,(b*p-(1-p))/b)*c.kelly,eq=equity().eq;let dollars=Math.min(k*eq,eq*c.perCap/100);
+ const heat=openHeat(),room=Math.max(0,eq*c.heatCap/100-heat);dollars=Math.min(dollars,room);
+ const n=Math.floor(dollars/price);return{side,price,kelly:k,n,cost:n*price,room};}
+function openHeat(){return S.trades.filter(t=>!t.closed).reduce((a,t)=>a+t.qty*t.price/100,0);}
+function riskCheck(m,sz){const r=[];if(S.trades.some(t=>!t.closed&&t.event_ticker===m.event_ticker))r.push('correlated: already open in event '+m.event_ticker);
+ if(sz.n<1)r.push(sz.room<=0?'max open heat '+S.cfg.heatCap+'% reached':'Kelly size < 1 contract');return r;}
+function pipeline(){const c=S.cfg,k={spread:0,vol:0,soon:0,far:0,nobook:0};const surv=[];
+ M.forEach(m=>{let r=null;if(m.yes_bid==null||m.yes_ask==null||m.yes_bid<=0||m.yes_ask>=100)r='nobook';else if(m.yes_ask-m.yes_bid>c.maxSpread)r='spread';
+  else if(m.volume_24h<c.minVol24)r='vol';else if(hrs(m)<c.minHours)r='soon';else if(hrs(m)>c.maxDays*24)r='far';
+  if(r)k[r]++;else{m.score=score(m);surv.push(m)}});
+ surv.sort((a,b)=>b.score-a.score);
+ let watch=0,buy=0,pass=0;surv.forEach(m=>{const j=judge(m,heur(m),'heuristic');m.j=j;j.action.startsWith('BUY')?buy++:j.action==='WATCH'?watch++:pass++});
+ RUN={scout:M.length,k,surv,buy,watch,pass,killed:M.length-surv.length};
+ const key=META.fetched_at;if(S.seen.run!==key){S.seen.run=key;log('Scout',`pulled ${M.length} open markets`);
+  log('Filter',`killed ${RUN.killed}: spread>${c.maxSpread}c ${k.spread}, vol24<${c.minVol24} ${k.vol}, <${c.minHours}h ${k.soon}, >${c.maxDays}d ${k.far}, no bid/ask ${k.nobook}`);
+  log('Analyst',`scored ${surv.length} survivors; top ${surv[0]?surv[0].ticker+' '+surv[0].score:'—'}`);
+  log('Judge',`heuristic pre-screen: ${buy} BUY candidates, ${watch} WATCH, ${pass} PASS (heuristic only — enter your own prob before trading)`);}}
+function equity(){const real=S.trades.filter(t=>t.closed).reduce((a,t)=>a+t.pnl,0),unr=S.trades.filter(t=>!t.closed).reduce((a,t)=>a+t.qty*((t.mark??t.price)-t.price)/100,0);
+ return{real,unr,eq:S.cfg.bankroll+real+unr};}
+function render(){const c=S.cfg,e=equity();
+ $('eq').textContent=usd(e.eq);$('eqsub').innerHTML=`realized <span class="${e.real>=0?'g':'r'}">${usd(e.real)}</span><br>unrealized <span class="${e.unr>=0?'g':'r'}">${usd(e.unr)}</span>`;
+ const cl=S.trades.filter(t=>t.closed).sort((a,b)=>a.closedAt.localeCompare(b.closedAt));
+ if(cl.length<1){$('curve').innerHTML='';$('curvenote').textContent='No closed paper trades yet — curve appears after your first close/settle.';}
+ else{let v=c.bankroll,pts=[v];cl.forEach(t=>pts.push(v+=t.pnl));const mn=Math.min(...pts),mx=Math.max(...pts),rg=mx-mn||1;
+  $('curve').innerHTML=`<polyline fill="none" stroke="${v>=c.bankroll?'#00f59b':'#ff4d6a'}" stroke-width="2" points="${pts.map((p,i)=>(i/(pts.length-1)*300).toFixed(1)+','+(65-(p-mn)/rg*60).toFixed(1)).join(' ')}"/>`;$('curvenote').textContent=cl.length+' closed paper trades';}
+ const R=RUN.k?RUN:{scout:0,k:{},surv:[],buy:0,watch:0,pass:0,killed:0},op=S.trades.filter(t=>!t.closed);
+ const A=[['Scout','pulls open markets',R.scout],['Filter','killed by rules',R.killed],['Analyst','survivors scored',R.surv.length],['Judge','heuristic BUY / WATCH',R.buy+' / '+R.watch],
+ ['Sizer','¼-Kelly, cap '+c.perCap+'%/'+c.heatCap+'%',usd(openHeat())],['Risk','open positions / heat',op.length+' · '+(openHeat()/e.eq*100).toFixed(1)+'%'],['Logger','entries',S.log.length]];
+ $('desk').innerHTML=A.map(a=>`<div class="agent"><b class="g">${a[0]}</b><span class="mu">${a[1]}</span><b class="px" style="text-align:right">${a[2]}</b></div>`).join('');
+ const L={spread:`spread > ${c.maxSpread}c`,vol:`24h volume < ${c.minVol24}`,soon:`closes < ${c.minHours}h`,far:`closes > ${c.maxDays}d`,nobook:'no bid/ask'};
+ $('died').innerHTML='<table>'+Object.keys(L).map(k=>`<tr><td>${L[k]}</td><td class="px r" style="text-align:right">${R.k[k]||0}</td></tr>`).join('')+`<tr><td><b>Survivors</b></td><td class="g px" style="text-align:right"><b>${R.surv.length}</b></td></tr></table>`;
+ $('log').innerHTML=S.log.map(l=>`<div><span class="mu">${l.t.slice(5,19).replace('T',' ')}</span> <b class="g">${l.a}</b> ${esc(l.m)}</div>`).join('')||'<span class="mu">empty</span>';
+ const cats=[...new Set(M.map(m=>m.category).filter(Boolean))].sort(),cs=$('cat'),cv=cs.value;cs.innerHTML='<option value="">All categories</option>'+cats.map(x=>`<option>${esc(x)}</option>`).join('');cs.value=cv;
+ renderScan();renderPos();renderRules();}
+function mcard(m){const sp=(m.yes_ask-m.yes_bid),mom=m.previous_price!=null&&m.last_price!=null?m.last_price-m.previous_price:0;
+ return `<div class="mk"><div class="row sp"><span class="mu">${esc(m.ticker)}</span>${m.j?`<span class="badge ${m.j.action.startsWith('BUY')?'g':m.j.action==='WATCH'?'y':'mu'}">${m.j.action} (heur.)</span>`:''}</div>
+ <div><b>${esc(m.title)}</b>${m.subtitle?` <span class="mu">— ${esc(m.subtitle)}</span>`:''}</div>
+ <div class="row sp px" style="font-size:12px;margin-top:4px"><span>Bid <b class="g">${m.yes_bid??'—'}¢</b> Ask <b class="r">${m.yes_ask??'—'}¢</b> Last ${m.last_price??'—'}¢ <span class="${mom>=0?'g':'r'}">${mom?(mom>0?'+':'')+mom.toFixed(0):''}</span></span><span class="mu">spr ${isNaN(sp)?'—':sp.toFixed(0)}¢</span></div>
+ <div class="mu px">Vol ${Math.round(m.volume).toLocaleString()} · 24h ${Math.round(m.volume_24h).toLocaleString()} · OI ${Math.round(m.open_interest).toLocaleString()} · depth $${Math.round(m.liquidity||0)} · closes ${new Date(m.close_time).toLocaleString()}${m.score!=null?' · score '+m.score:''}</div>
+ <div class="row" style="margin-top:6px"><button class="b bg" onclick="dossier('${m.ticker}')">Run Judge</button><a class="b" target="_blank" rel="noopener" href="https://kalshi.com/markets/${(m.series_ticker||'').toLowerCase()}">kalshi.com ↗</a></div></div>`;}
+function renderScan(){const q=$('q').value.toLowerCase(),cat=$('cat').value,base=$('view').value==='all'?M:(RUN.surv||[]);
+ const L=base.filter(m=>(!cat||m.category===cat)&&(!q||(m.ticker+' '+m.title+' '+(m.subtitle||'')+' '+(m.event_title||'')).toLowerCase().includes(q)));
+ $('scancount').textContent=`${L.length} markets${L.length>60?' (showing 60)':''}`;$('mlist').innerHTML=L.slice(0,60).map(mcard).join('')||'<span class="mu">No markets match.</span>';}
+let CUR=null;
+function dossier(tk,fairIn){const m=BY[tk];CUR=tk;const own=fairIn!=null&&fairIn!=='';const fair=own?+fairIn:heur(m),j=judge(m,fair,own?'owen':'heuristic'),sz=size(m,j),rk=riskCheck(m,sz),c=S.cfg;
+ const yn=(ok,t)=>`<tr><td>${t}</td><td class="${ok?'g':'r'}">${ok?'YES':'NO'}</td></tr>`;
+ $('dossier').innerHTML=`<div class="row sp"><h2>Judge dossier</h2><button class="b" onclick="closeD()">✕</button></div>
+ <div class="mu">${esc(m.ticker)} · ${esc(m.category)}</div><b>${esc(m.title)}</b> <span class="mu">${esc(m.subtitle||'')}</span>
+ <div class="px" style="margin:6px 0">YES bid ${m.yes_bid}¢ / ask ${m.yes_ask}¢ · NO ask ${j.noAsk}¢ · closes ${new Date(m.close_time).toLocaleString()}</div>
+ <label>Your probability YES (%) — your independent fair value</label><input id="myp" type="number" min="1" max="99" step="0.5" value="${own?fairIn:''}" placeholder="blank = heuristic ${heur(m).toFixed(1)}" onchange="dossier('${tk}',this.value)"><button class="b" style="margin-top:6px">Judge my probability</button>
+ <table style="margin-top:8px"><tr><td>1. Independent fair value?</td><td class="${own?'g':'y'}">${own?'YES — yours: '+fair+'%':'NO — heuristic '+fair.toFixed(1)+'% (labelled heuristic)'}</td></tr>
+ ${yn(Math.max(j.eY,j.eN)>=c.minEdge,`2. Edge ≥ ${c.minEdge}c? (YES ${j.eY.toFixed(1)}c / NO ${j.eN.toFixed(1)}c)`)}
+ <tr><td>3. Exit risk (1-5)</td><td class="${j.risk>=4?'r':j.risk>=3?'y':'g'}">${j.risk}</td></tr>
+ <tr><td>4. Action</td><td><b class="${j.action.startsWith('BUY')?'g':j.action==='WATCH'?'y':'mu'}">${j.action}</b> <span class="mu">${j.why}</span></td></tr></table>
+ <div class="card" style="margin:10px 0"><b>Sizer</b> <span class="mu">(${c.kelly}× Kelly, cap ${c.perCap}%/position, ${c.heatCap}% heat)</span><br>
+ ${j.action.startsWith('BUY')?`${sz.side} @ ${(sz.price*100).toFixed(0)}¢ · full-Kelly frac ${(sz.kelly/c.kelly*100).toFixed(1)}% → <b>${sz.n} contracts = ${usd(sz.cost)}</b>`:'No size — action is '+j.action}
+ ${rk.length?`<div class="r">Risk: ${rk.join('; ')}</div>`:''}</div>
+ ${!own?'<div class="y" style="font-size:12px">Enter your own probability to enable paper trading. The heuristic is not an edge.</div>':''}
+ <div class="row" style="margin-top:8px"><button class="b bg" ${own?'':'disabled'} onclick="paper('YES')">Paper Buy YES @ ${m.yes_ask}¢</button><button class="b br" ${own?'':'disabled'} onclick="paper('NO')">Paper Buy NO @ ${j.noAsk}¢</button></div>
+ <label>Contracts (default = Sizer)</label><input id="qty" type="number" min="1" value="${Math.max(1,sz.n)}">
+ <a class="b" style="margin-top:8px" target="_blank" rel="noopener" href="https://kalshi.com/markets/${m.series_ticker.toLowerCase()}">Open on kalshi.com ↗</a>`;
+ $('modal').classList.remove('hide');}
+function closeD(){$('modal').classList.add('hide');}
+function paper(side){const m=BY[CUR],p=+$('myp').value,qty=Math.max(1,+$('qty').value|0);if(!(p>0&&p<100))return alert('Enter your probability 1-99');
+ if(S.trades.some(t=>!t.closed&&t.event_ticker===m.event_ticker)&&!confirm('Risk: correlated stacking — already open in this event. Override?'))return log('Risk','blocked correlated stack '+m.ticker),save(),render();
+ const price=side==='YES'?m.yes_ask:(m.no_ask??100-m.yes_bid),eq=equity().eq;
+ if(openHeat()+qty*price/100>eq*S.cfg.heatCap/100&&!confirm('Exceeds max open heat '+S.cfg.heatCap+'%. Override?'))return;
+ const j=judge(m,p,'owen');S.trades.push({id:Date.now(),ticker:m.ticker,event_ticker:m.event_ticker,series_ticker:m.series_ticker,title:m.title+(m.subtitle?' — '+m.subtitle:''),side,qty,price,myp:p,mktp:(m.yes_bid+m.yes_ask)/2,openedAt:ts(),mark:side==='YES'?m.yes_bid:(m.no_bid??100-m.yes_ask),closed:false});
+ log('Logger',`PAPER BUY ${side} ${qty}× ${m.ticker} @ ${price}¢ · my p=${p}% · edge ${(side==='YES'?j.eY:j.eN).toFixed(1)}c · judge=${j.action} · exit: sell if edge gone or at bid ≥ fair`);save();closeD();render();}
+function closeT(id,how){const t=S.trades.find(x=>x.id===id);let exit;
+ if(how==='mark'){exit=t.mark??t.price}else{exit=(how==='YES')===(t.side==='YES')?100:0;t.outcome=how==='YES'?1:0;}
+ t.closed=true;t.exit=exit;t.closedAt=ts();t.how=how;t.pnl=t.qty*(exit-t.price)/100;
+ log('Logger',`${how==='mark'?'CLOSE at bid':'SETTLE '+how} ${t.ticker} ${t.side} ${t.qty}× ${t.price}→${exit}¢ P&L ${usd(t.pnl)}`);save();render();}
+function renderPos(){const op=S.trades.filter(t=>!t.closed),cl=S.trades.filter(t=>t.closed).reverse();
+ $('open').innerHTML=op.map(t=>{const u=t.qty*((t.mark??t.price)-t.price)/100,live=!!BY[t.ticker];return `<div class="mk"><div class="mu">${esc(t.ticker)} · ${t.openedAt.slice(0,16).replace('T',' ')}</div><b>${esc(t.title)}</b>
+ <div class="px">${t.side} ${t.qty}× @ ${t.price}¢ · mark ${t.mark??'—'}¢ ${live?'':'<span class="y">(not in latest data — check result on Kalshi)</span>'} · <span class="${u>=0?'g':'r'}">${usd(u)}</span> · my p ${t.myp}%</div>
+ <div class="row" style="margin-top:6px"><button class="b" onclick="closeT(${t.id},'mark')">Close @ bid</button><button class="b" onclick="closeT(${t.id},'YES')">Settled YES</button><button class="b" onclick="closeT(${t.id},'NO')">Settled NO</button></div></div>`}).join('')||'<span class="mu">No open paper positions. Use Scanner → Run Judge.</span>';
+ $('closed').innerHTML=cl.length?'<table><tr><th>Ticker</th><th>Side</th><th>In→Out</th><th>P&L</th></tr>'+cl.map(t=>`<tr><td>${esc(t.ticker)}</td><td>${t.side}${t.how!=='mark'?' ('+t.how+')':''}</td><td class="px">${t.price}→${t.exit}</td><td class="px ${t.pnl>=0?'g':'r'}">${usd(t.pnl)}</td></tr>`).join('')+'</table>':'<span class="mu">None yet.</span>';
+ const d=new Date().toISOString().slice(0,10),e=equity(),todays=S.trades.filter(t=>t.openedAt.startsWith(d)||(t.closedAt||'').startsWith(d));
+ $('rep').textContent=`KALSHI DESK — PAPER REPORT ${d}\nEquity ${usd(e.eq)} (bankroll ${usd(S.cfg.bankroll)}, realized ${usd(e.real)}, unrealized ${usd(e.unr)})\nOpen ${op.length} · heat ${usd(openHeat())} · closed total ${cl.length}\nData: ${M.length} markets @ ${META.fetched_at||'—'} · survivors ${RUN.surv?.length??0}\n`+
+ (todays.map(t=>`- ${t.closed&&t.closedAt.startsWith(d)?'CLOSED':'OPENED'} ${t.side} ${t.qty}× ${t.ticker} @${t.price}¢${t.closed?' → '+t.exit+'¢ '+usd(t.pnl):''}`).join('\n')||'- no activity today');}
+function copyRep(){navigator.clipboard?.writeText($('rep').textContent).then(()=>alert('Copied'),()=>alert('Copy failed — select text manually'));}
+function renderRules(){const c=S.cfg,F=[['bankroll','Bankroll $',100,10000,50],['kelly','Kelly fraction',0.05,1,0.05],['maxSpread','Max spread (¢)',1,20,1],['minVol24','Min 24h volume (contracts)',0,5000,10],
+ ['minHours','Min hours to close',0,48,1],['maxDays','Max days to close',1,365,1],['minEdge','Min edge (¢)',1,20,1],['perCap','Max % bankroll / position',1,20,1],['heatCap','Max open heat %',5,50,1]];
+ if(!$('sliders').dataset.b){$('sliders').dataset.b=1;$('sliders').innerHTML=F.map(f=>`<label>${f[1]}: <b id="v-${f[0]}"></b></label><input type="range" id="s-${f[0]}" min="${f[2]}" max="${f[3]}" step="${f[4]}" oninput="S.cfg.${f[0]}=+this.value;$('v-${f[0]}').textContent=this.value" onchange="log('Risk','rule ${f[0]} → '+this.value);pipeline();save();render()">`).join('');}
+ F.forEach(f=>{$('s-'+f[0]).value=c[f[0]];$('v-'+f[0]).textContent=c[f[0]];});
+ const st=S.trades.filter(t=>t.closed&&t.outcome!=null),n=st.length;
+ const brier=(k)=>n?st.reduce((a,t)=>a+(t[k]/100-t.outcome)**2,0)/n:null,bo=brier('myp'),bm=brier('mktp'),ready=n>=30&&bo<bm;
+ $('ready').innerHTML=`<div class="big ${ready?'g':'r'}">${ready?'READY (small size)':'NOT READY'}</div><div class="mu">Needs ≥ 30 settled paper trades <b>and</b> your Brier score better (lower) than the market mid at entry.</div>
+ <table><tr><td>Settled paper trades</td><td class="${n>=30?'g':'r'}">${n} / 30</td></tr><tr><td>Your Brier</td><td>${bo==null?'—':bo.toFixed(4)}</td></tr><tr><td>Market Brier</td><td>${bm==null?'—':bm.toFixed(4)}</td></tr></table>`;
+ const B=[[0,10],[10,30],[30,50],[50,70],[70,90],[90,100]];
+ $('calib').innerHTML=n?'<table><tr><th>Your p</th><th>N</th><th>Avg p</th><th>Hit rate</th></tr>'+B.map(([a,b])=>{const s=st.filter(t=>t.myp>=a&&(t.myp<b||b===100));return `<tr><td>${a}-${b}%</td><td>${s.length}</td><td>${s.length?(s.reduce((x,t)=>x+t.myp,0)/s.length).toFixed(0)+'%':'—'}</td><td>${s.length?(s.reduce((x,t)=>x+t.outcome,0)/s.length*100).toFixed(0)+'%':'—'}</td></tr>`}).join('')+'</table>':'<span class="mu">No settled trades yet. Use "Settled YES/NO" in Positions once a market resolves (closes at bid don\'t count).</span>';}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));['term','scan','pos','rules'].forEach(t=>$('t-'+t).classList.toggle('hide',t!==b.dataset.t));scrollTo(0,0)});
+$('modal').onclick=e=>{if(e.target.id==='modal')closeD()};
+render();load();
+</script></body></html>
